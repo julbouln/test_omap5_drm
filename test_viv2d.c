@@ -20,13 +20,15 @@ void test1(viv2d_device *dev) {
 	viv2d_surface *surf;
 
 	viv2d_surface *surf1, *surf2, *surf3, *surf4, *surf5,
-	              *surf6, *surf7, *surf8, *surf9, *surf10;
+	              *surf6, *surf7, *surf8, *surf9, *surf10, *surfpat;
 	viv2d_op *op;
 
 	viv2d_rect r;
 #if 1
 
 	surf = viv2d_surface_new(dev, 1, 2, viv2d_a8r8g8b8);
+
+	surfpat = viv2d_surface_new(dev, 8, 8, viv2d_a8r8g8b8);
 
 	surf1 = viv2d_surface_new(dev, 64, 64, viv2d_a8r8g8b8);
 	surf2 = viv2d_surface_new(dev, 128, 128, viv2d_a8r8g8b8);
@@ -39,6 +41,21 @@ void test1(viv2d_device *dev) {
 	surf8 = viv2d_surface_new(dev, 1, 1, viv2d_a8r8g8b8);
 	surf9 = viv2d_surface_new(dev, 256, 256, viv2d_a8r8g8b8);
 	surf10 = viv2d_surface_new(dev, 256, 256, viv2d_a8r8g8b8);
+
+	// clear
+	op = viv2d_op_new(viv2d_cmd_clear, NULL, surfpat);
+	viv2d_op_set_color(op, 0xff40ff40);// green/ABGR
+	viv2d_op_add_rect(op, 0, 0, 4, 4);
+	viv2d_op_add_rect(op, 4, 4, 4, 4);
+	viv2d_op_exec(dev, op);
+	viv2d_op_del(op);
+
+	op = viv2d_op_new(viv2d_cmd_clear, NULL, surfpat);
+	viv2d_op_set_color(op, 0xff4040ff); // red/ABGR
+	viv2d_op_add_rect(op, 0, 4, 4, 4);
+	viv2d_op_add_rect(op, 4, 0, 4, 4);
+	viv2d_op_exec(dev, op);
+	viv2d_op_del(op);
 
 	// clear
 	op = viv2d_op_new(viv2d_cmd_clear, NULL, surf1);
@@ -158,7 +175,7 @@ void test1(viv2d_device *dev) {
 	op = viv2d_op_new(viv2d_cmd_bitblt, NULL, surf10);
 //	viv2d_op_set_blend(op, viv2d_blend_xor, 0xff, 0xff);
 //	viv2d_op_set_color(op, 0xff4040ff); // ABGR
-	op->pat = surf1;
+	op->pat = surfpat;
 //	op13->rop = 0xcc;
 	op->rop = 0xf0;
 //	viv2d_op_add_rect(op13, 64, 64, 128, 128);
@@ -175,7 +192,8 @@ void test1(viv2d_device *dev) {
 	viv2d_surface_to_bmp(surf6, "out/blend.bmp");
 	viv2d_surface_to_bmp(surf7, "out/multisrc.bmp");
 	viv2d_surface_to_bmp(surf9, "out/stretch.bmp");
-	viv2d_surface_to_bmp(surf10, "out/pat.bmp");
+	viv2d_surface_to_bmp(surfpat, "out/pat.bmp");
+	viv2d_surface_to_bmp(surf10, "out/out_pat.bmp");
 
 	viv2d_surface_del(surf1);
 	viv2d_surface_del(surf2);
@@ -242,14 +260,24 @@ void test_blend1(viv2d_device *dev) {
 
 
 void test_blend2(viv2d_device *dev) {
-	viv2d_surface *src, *mask, *tmp, *dest, *out;
+	viv2d_surface *src, *mask, *tmp, *dest, *dest_mul, *out, *out_mul;
 	viv2d_op *op;
 
-	src = viv2d_surface_new(dev, 128, 128, viv2d_x8r8g8b8);
+	src = viv2d_surface_new(dev, 128, 128, viv2d_a8r8g8b8);
 	mask = viv2d_surface_new(dev, 128, 128, viv2d_a8r8g8b8);
 	tmp = viv2d_surface_new(dev, 128, 128, viv2d_a8r8g8b8);
 	dest = viv2d_surface_new(dev, 256, 256, viv2d_x8r8g8b8);
 	out = viv2d_surface_new(dev, 256, 256, viv2d_a8r8g8b8);
+
+	dest_mul = viv2d_surface_new(dev, 128, 128, viv2d_a8r8g8b8);
+	out_mul = viv2d_surface_new(dev, 128, 128, viv2d_a8r8g8b8);
+
+	op = viv2d_op_new(viv2d_cmd_clear, NULL, src);
+	viv2d_op_add_rect(op, 0, 0, 64, 64);
+	viv2d_op_add_rect(op, 64, 64, 64, 64);
+	viv2d_op_set_color(op, 0xff4040ff); // ABGR
+	viv2d_op_exec(dev, op);
+	viv2d_op_del(op);
 
 	op = viv2d_op_new(viv2d_cmd_clear, NULL, dest);
 	viv2d_op_set_color(op, 0xffffffff); // ABGR
@@ -288,11 +316,35 @@ void test_blend2(viv2d_device *dev) {
 
 	viv2d_commit(dev);
 
+/*
+	op = viv2d_op_new(viv2d_cmd_clear, NULL, dest_mul);
+	viv2d_op_set_color(op, 0xff40ff40); // ABGR
+	viv2d_op_exec(dev, op);
+	viv2d_op_del(op);
+*/
+	op = viv2d_op_new(viv2d_cmd_multsrcblt, src, dest_mul);
+	viv2d_op_set_blend(op, viv2d_blend_over, false, 0x00, false, 0x00);
+	op->srcs[0] = src;
+	op->srcs[1] = mask;
+//	op->srcs[2] = src;
+//	op->srcs[3] = mask;
+	op->src_count = 2;
+	viv2d_op_exec(dev, op);
+	viv2d_op_del(op);
+
+	op = viv2d_op_new(viv2d_cmd_bitblt, dest_mul, out_mul);
+	viv2d_op_exec(dev, op);
+	viv2d_op_del(op);
+
+	viv2d_commit(dev);
+
 	viv2d_surface_to_bmp(src, "out/blend_src.bmp");
 	viv2d_surface_to_bmp(mask, "out/blend_mask.bmp");
 	viv2d_surface_to_bmp(tmp, "out/blend_tmp.bmp");
-	viv2d_surface_to_bmp(dest, "out/blend_dest1.bmp");
-	viv2d_surface_to_bmp(out, "out/blend_dest.bmp");
+	viv2d_surface_to_bmp(dest, "out/blend_dest.bmp");
+	viv2d_surface_to_bmp(dest_mul, "out/blend_dest_mul.bmp");
+	viv2d_surface_to_bmp(out, "out/blend_out.bmp");
+	viv2d_surface_to_bmp(out_mul, "out/blend_out_mul.bmp");
 
 	viv2d_surface_del(src);
 	viv2d_surface_del(mask);
@@ -414,6 +466,12 @@ int main(int argc, char *argv[])
 	viv2d_device *dev;
 
 	dev = viv2d_device_open(argv[1]);
+
+	viv2d_surface *surf = viv2d_surface_new(dev, 64, 64, viv2d_a8r8g8b8);
+	printf("FIRST bo %p\n",etna_bo_map(surf->bo));
+	viv2d_surface_del(surf);
+	surf = viv2d_surface_new(dev, 64, 64, viv2d_a8r8g8b8);
+	printf("FIRST bo %p\n",etna_bo_map(surf->bo));
 
 	printf("TEST START\n");
 	test1(dev);

@@ -109,7 +109,8 @@ typedef struct _viv2d_op {
 	viv2d_surface *pat;
 	viv2d_surface *dst;
 
-	viv2d_surface *src1;
+	viv2d_surface *srcs[4];
+	int src_count;
 
 	int src_x;
 	int src_y;

@@ -82,14 +82,13 @@ int main(int argc, char *argv[]) {
 	}
 
 	int omap_fd = open_card("/dev/dri/card1");
-
 	struct omap_device *omap_dev = omap_device_new(omap_fd);
 	if (!omap_dev) {
 		return -1;
 	}
-viv2d_device v2d;
-v2d.fd = etna_fd;
-v2d.dev = etna_dev;
+	viv2d_device v2d;
+	v2d.fd = etna_fd;
+	v2d.dev = etna_dev;
 
 	struct timeval tvBegin, tvEnd, tvDiff;
 
@@ -116,9 +115,9 @@ v2d.dev = etna_dev;
 
 	gettimeofday(&tvBegin, NULL);
 	for (int i = 0; i < repeat; i++) {
-		char *buf = (char *)aligned_alloc(4096, ALIGN(bufsize,4096));
+		char *buf = (char *)aligned_alloc(4096, ALIGN(bufsize, 4096));
 		struct etna_bo *bo;
-		bo = etna_bo_from_usermem_prot(etna_dev, buf, ALIGN(bufsize,4096), (ETNA_USERPTR_READ | ETNA_USERPTR_WRITE));
+		bo = etna_bo_from_usermem_prot(etna_dev, buf, ALIGN(bufsize, 4096), (ETNA_USERPTR_READ | ETNA_USERPTR_WRITE));
 		etna_bo_del(bo);
 		free(buf);
 	}
