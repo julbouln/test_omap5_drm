@@ -171,6 +171,9 @@ void test1(viv2d_device *dev) {
 	viv2d_op_del(op);
 
 
+	viv2d_commit(dev);
+
+#if 0
 //	op13 = viv2d_op_new(viv2d_cmd_line, NULL, surf10);
 	op = viv2d_op_new(viv2d_cmd_bitblt, NULL, surf10);
 //	viv2d_op_set_blend(op, viv2d_blend_xor, 0xff, 0xff);
@@ -180,6 +183,12 @@ void test1(viv2d_device *dev) {
 	op->rop = 0xf0;
 //	viv2d_op_add_rect(op13, 64, 64, 128, 128);
 //	viv2d_op_add_rect(op13, 0, 0, 0, 0);
+	viv2d_op_exec(dev, op);
+	viv2d_op_del(op);
+#endif
+	op = viv2d_op_new(viv2d_cmd_bitblt, NULL, surf10);
+	op->pat_fill = 1;
+	viv2d_op_set_color(op, 0xff4040ff);
 	viv2d_op_exec(dev, op);
 	viv2d_op_del(op);
 
@@ -244,7 +253,6 @@ void test_blend1(viv2d_device *dev) {
 	viv2d_op_del(op);
 
 	viv2d_commit(dev);
-
 
 	viv2d_surface_to_bmp(src, "out/blend1_src.bmp");
 	viv2d_surface_to_bmp(mask, "out/blend1_mask.bmp");
@@ -316,19 +324,19 @@ void test_blend2(viv2d_device *dev) {
 
 	viv2d_commit(dev);
 
-/*
-	op = viv2d_op_new(viv2d_cmd_clear, NULL, dest_mul);
-	viv2d_op_set_color(op, 0xff40ff40); // ABGR
-	viv2d_op_exec(dev, op);
-	viv2d_op_del(op);
-*/
-	op = viv2d_op_new(viv2d_cmd_multsrcblt, src, dest_mul);
-	viv2d_op_set_blend(op, viv2d_blend_over, false, 0x00, false, 0x00);
+	/*
+		op = viv2d_op_new(viv2d_cmd_clear, NULL, dest_mul);
+		viv2d_op_set_color(op, 0xff40ff40); // ABGR
+		viv2d_op_exec(dev, op);
+		viv2d_op_del(op);
+	*/
+	op = viv2d_op_new(viv2d_cmd_multsrcblt, NULL, dest_mul);
+	viv2d_op_set_blend(op, viv2d_blend_add, false, 0x00, false, 0x00);
 	op->srcs[0] = src;
 	op->srcs[1] = mask;
-//	op->srcs[2] = src;
-//	op->srcs[3] = mask;
-	op->src_count = 2;
+	op->srcs[2] = src;
+	op->srcs[3] = mask;
+	op->src_count = 4;
 	viv2d_op_exec(dev, op);
 	viv2d_op_del(op);
 
@@ -461,6 +469,134 @@ void test_colorconversion(viv2d_device *dev) {
 
 }
 
+int test_monochrome(viv2d_device *dev) {
+
+	/* Text data to expand, packed per 8x4 bits in 32 bit words */
+	uint32_t text_width = 128;
+	uint32_t text_height = 8;
+	uint32_t text_data[] = {
+		0xa9aada89, 0x00898a88, 0xc20528c8, 0x00c82825, 0x00008080, 0x00808000,
+		0x724a49f0, 0x00f24a4b, 0x27284887, 0x002728e0, 0x0808881c, 0x001c8888,
+		0x80804830, 0x00304880, 0x08080000, 0x00020508, 0xa29c0000, 0x001c20be,
+		0xcab10000, 0x00838083, 0x02e60002, 0x00c722c2, 0x221c0000, 0x001c2222,
+		0xc8b00000, 0x00888888, 0x03000807, 0x00070800, 0x00808000, 0x00189880,
+		0xa8988870, 0x007088c8
+	};
+	uint32_t text_size = sizeof(text_data) / 4;
+
+	printf("mono blit %d\n",text_size);
+
+	viv2d_surface *dest;
+	dest = viv2d_surface_new(dev, 256, 192, viv2d_a8r8g8b8);
+
+	viv2d_op *op;
+	op = viv2d_op_new(viv2d_cmd_mono_blit, NULL, dest);
+	viv2d_op_add_rect(op, 4, 4, text_width, text_height);
+
+	op->data = text_data;
+	op->data_pitch = 4;
+	op->data_size = text_size;
+	viv2d_op_set_color(op, 0xff40ff40);// green/ABGR
+	viv2d_op_exec(dev, op);
+	viv2d_op_del(op);
+
+	viv2d_commit(dev);
+
+	viv2d_surface_to_bmp(dest, "out/mono_dest.bmp");
+
+#if 0
+	etna_set_state(dev->stream, VIVS_DE_SRC_ADDRESS, 0); /* source address is ignored for monochrome blits */
+	//etna_set_state(ctx, VIVS_DE_SRC_ADDRESS, etna_bo_gpu_address(src));
+	etna_set_state(dev->stream, VIVS_DE_SRC_STRIDE, 4);
+	etna_set_state(dev->stream, VIVS_DE_SRC_ROTATION_CONFIG, 0);
+	etna_set_state(dev->stream, VIVS_DE_SRC_CONFIG,
+	               VIVS_DE_SRC_CONFIG_UNK16 |
+	               VIVS_DE_SRC_CONFIG_SOURCE_FORMAT(DE_FORMAT_MONOCHROME) |
+	               VIVS_DE_SRC_CONFIG_LOCATION_STREAM |
+	               VIVS_DE_SRC_CONFIG_PACK_PACKED8 | /* 8 by 4 blocks */
+	               VIVS_DE_SRC_CONFIG_PE10_SOURCE_FORMAT(DE_FORMAT_MONOCHROME));
+	etna_set_state(dev->stream, VIVS_DE_SRC_ORIGIN, 0);
+	etna_set_state(dev->stream, VIVS_DE_SRC_SIZE, 0); // source size is ignored
+	etna_set_state(dev->stream, VIVS_DE_SRC_COLOR_BG, 0xff2020ff);
+	etna_set_state(dev->stream, VIVS_DE_SRC_COLOR_FG, 0xffffffff);
+	etna_set_state(dev->stream, VIVS_DE_STRETCH_FACTOR_LOW, 0);
+	etna_set_state(dev->stream, VIVS_DE_STRETCH_FACTOR_HIGH, 0);
+	etna_set_state(dev->stream, VIVS_DE_DEST_ADDRESS, etna_bo_gpu_address(bmp));
+	etna_set_state(dev->stream, VIVS_DE_DEST_STRIDE, width * 4);
+	etna_set_state(dev->stream, VIVS_DE_DEST_ROTATION_CONFIG, 0);
+	etna_set_state(dev->stream, VIVS_DE_DEST_CONFIG,
+	               VIVS_DE_DEST_CONFIG_FORMAT(DE_FORMAT_A8R8G8B8) |
+	               VIVS_DE_DEST_CONFIG_COMMAND_BIT_BLT |
+	               VIVS_DE_DEST_CONFIG_SWIZZLE(DE_SWIZZLE_ARGB) |
+	               VIVS_DE_DEST_CONFIG_TILED_DISABLE |
+	               VIVS_DE_DEST_CONFIG_MINOR_TILED_DISABLE
+	              );
+
+	etna_set_state(dev->stream, VIVS_DE_ROP,
+	               VIVS_DE_ROP_ROP_FG(0xcc) | VIVS_DE_ROP_ROP_BG(0xcc) | VIVS_DE_ROP_TYPE_ROP4);
+	etna_set_state(dev->stream, VIVS_DE_CLIP_TOP_LEFT,
+	               VIVS_DE_CLIP_TOP_LEFT_X(0) |
+	               VIVS_DE_CLIP_TOP_LEFT_Y(0)
+	              );
+	etna_set_state(dev->stream, VIVS_DE_CLIP_BOTTOM_RIGHT,
+	               VIVS_DE_CLIP_BOTTOM_RIGHT_X(width) |
+	               VIVS_DE_CLIP_BOTTOM_RIGHT_Y(height)
+	              );
+	etna_set_state(dev->stream, VIVS_DE_CONFIG, 0); /* TODO */
+	etna_set_state(dev->stream, VIVS_DE_SRC_ORIGIN_FRACTION, 0);
+	etna_set_state(dev->stream, VIVS_DE_ALPHA_CONTROL, 0);
+	etna_set_state(dev->stream, VIVS_DE_ALPHA_MODES, 0);
+	etna_set_state(dev->stream, VIVS_DE_DEST_ROTATION_HEIGHT, 0);
+	etna_set_state(dev->stream, VIVS_DE_SRC_ROTATION_HEIGHT, 0);
+	etna_set_state(dev->stream, VIVS_DE_ROT_ANGLE, 0);
+
+	/* Clear color PE20 */
+	etna_set_state(dev->stream, VIVS_DE_CLEAR_PIXEL_VALUE32, 0xff40ff40);
+	/* Clear color PE10 */
+	etna_set_state(dev->stream, VIVS_DE_CLEAR_BYTE_MASK, 0xff);
+	etna_set_state(dev->stream, VIVS_DE_CLEAR_PIXEL_VALUE_LOW, 0xff40ff40);
+	etna_set_state(dev->stream, VIVS_DE_CLEAR_PIXEL_VALUE_HIGH, 0xff40ff40);
+
+	etna_set_state(dev->stream, VIVS_DE_DEST_COLOR_KEY, 0);
+	etna_set_state(dev->stream, VIVS_DE_GLOBAL_SRC_COLOR, 0);
+	etna_set_state(dev->stream, VIVS_DE_GLOBAL_DEST_COLOR, 0);
+	etna_set_state(dev->stream, VIVS_DE_COLOR_MULTIPLY_MODES, 0);
+	etna_set_state(dev->stream, VIVS_DE_PE_TRANSPARENCY, 0);
+	etna_set_state(dev->stream, VIVS_DE_PE_CONTROL, 0);
+	etna_set_state(dev->stream, VIVS_DE_PE_DITHER_LOW, 0xffffffff);
+	etna_set_state(dev->stream, VIVS_DE_PE_DITHER_HIGH, 0xffffffff);
+
+	/* Queue DE command */
+	etna_reserve(dev->stream, 256 * 2 + 2 + text_size);
+	(ctx)->buf[(dev->stream)->offset++] = VIV_FE_DRAW_2D_HEADER_OP_DRAW_2D |
+	                                      VIV_FE_DRAW_2D_HEADER_COUNT(NUM_RECTS) |
+	                                      VIV_FE_DRAW_2D_HEADER_DATA_COUNT(text_size);
+	(ctx)->offset++; /* rectangles start aligned */
+	for (int rec = 0; rec < NUM_RECTS; ++rec)
+	{
+		int x1 = 4 + 16 * rec;
+		int y1 = 4;
+		int x2 = x1 + text_width;
+		int y2 = y1 + text_height;
+		(dev->stream)->buf[(dev->stream)->offset++] = VIV_FE_DRAW_2D_TOP_LEFT_X(x1) |
+		        VIV_FE_DRAW_2D_TOP_LEFT_Y(y1);
+		(dev->stream)->buf[(dev->stream)->offset++] = VIV_FE_DRAW_2D_BOTTOM_RIGHT_X(x2) |
+		        VIV_FE_DRAW_2D_BOTTOM_RIGHT_Y(y2);
+	}
+	/* data in-stream */
+	ETNA_ALIGN(dev->stream);
+	for (int ptr = 0; ptr < text_size; ++ptr)
+		(dev->stream)->buf[(ctx)->offset++] = text_data[ptr];
+	ETNA_ALIGN(ctx);
+	etna_set_state(dev->stream, 1, 0);
+	etna_set_state(dev->stream, 1, 0);
+	etna_set_state(dev->stream, 1, 0);
+
+	etna_set_state(dev->stream, VIVS_GL_FLUSH_CACHE, VIVS_GL_FLUSH_CACHE_PE2D);
+	etna_finish(dev->stream);
+#endif
+}
+
 int main(int argc, char *argv[])
 {
 	viv2d_device *dev;
@@ -468,16 +604,17 @@ int main(int argc, char *argv[])
 	dev = viv2d_device_open(argv[1]);
 
 	viv2d_surface *surf = viv2d_surface_new(dev, 64, 64, viv2d_a8r8g8b8);
-	printf("FIRST bo %p\n",etna_bo_map(surf->bo));
+	printf("FIRST bo %p\n", etna_bo_map(surf->bo));
 	viv2d_surface_del(surf);
 	surf = viv2d_surface_new(dev, 64, 64, viv2d_a8r8g8b8);
-	printf("FIRST bo %p\n",etna_bo_map(surf->bo));
+	printf("FIRST bo %p\n", etna_bo_map(surf->bo));
 
 	printf("TEST START\n");
 	test1(dev);
 	test_blend1(dev);
 	test_blend2(dev);
 	test_colorconversion(dev);
+	test_monochrome(dev);
 //	test_usermem(dev);
 	printf("TEST END\n");
 

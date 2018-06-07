@@ -76,7 +76,9 @@ typedef enum {
 	viv2d_cmd_line,
 	viv2d_cmd_bitblt,
 	viv2d_cmd_stretchblt,
-	viv2d_cmd_multsrcblt
+	viv2d_cmd_multsrcblt,
+	viv2d_cmd_pat_fill,
+	viv2d_cmd_mono_blit
 } viv2d_op_cmd;
 
 typedef enum {
@@ -116,6 +118,7 @@ typedef struct _viv2d_op {
 	int src_y;
 	int rop;
 	int color;
+	int pat_fill;
 
 	int num_rects;
 	viv2d_rect rects[VIV2D_MAX_RECTS];
@@ -128,6 +131,12 @@ typedef struct _viv2d_op {
 	uint8_t dst_alpha;
 	uint8_t is_blend;
 	viv2d_blend blend;
+
+
+
+	uint32_t *data;
+	uint32_t data_pitch;
+	uint32_t data_size;
 
 } viv2d_op;
 
